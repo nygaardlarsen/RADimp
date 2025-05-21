@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\RAD\\app\\app.csproj",
+      "projectUniqueName": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\ModComp\\1803\\RADimp\\app\\app.csproj",
       "projectName": "app",
-      "projectPath": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\RAD\\app\\app.csproj",
+      "projectPath": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\ModComp\\1803\\RADimp\\app\\app.csproj",
       "packagesPath": "C:\\Users\\thoma\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\RAD\\app\\obj\\",
+      "outputPath": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\ModComp\\1803\\RADimp\\app\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\thoma\\AppData\\Roaming\\NuGet\\NuGet.Config"
