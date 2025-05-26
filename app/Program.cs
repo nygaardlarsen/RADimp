@@ -43,6 +43,69 @@ public static class HashFunctions
 
 }
 
+public class HashTableChaining
+{
+    private readonly int l;
+    private readonly int tableSize;
+    private readonly List<(ulong key, long value)>[] table;
+    private readonly Func<ulong, ulong> hashFunction;
+    public HashTableChaining(Func<ulong, ulong> hashFunction, int l)
+    {
+        this.l = l;
+        this.tableSize = 1 << l; // 2^l
+        this.hashFunction = hashFunction;
+        table = new List<(ulong key, long value)>[tableSize];
+        for (int i = 0; i < tableSize; i++)
+        {
+            table[i] = new List<(ulong key, long value)>();
+        }
+    }
+
+    private int Index(ulong x)
+    {
+        return (int)(hashFunction(x) % (ulong)tableSize);
+    }
+
+    public long Get(ulong x)
+    {
+        int index = Index(x);
+        foreach (var (key, value) in table[index])
+        {
+            if (key == x) return value;
+        }
+        return 0; // Not found
+    }
+
+    public void Set(ulong x, long value)
+    {
+        int index = Index(x);
+        for (int i = 0; i < table[index].Count; i++)
+        {
+            if (table[index][i].key == x)
+            {
+                table[index][i] = (x, value); // Update existing value
+                return;
+            }
+        }
+        table[index].Add((x, value)); // Add new key-value pair
+    }
+
+    public void Increment(ulong x, long d)
+    {
+        int index = Index(x);
+        for (int i = 0; i < table[index].Count; i++)
+        {
+            if (table[index][i].key == x)
+            {
+                table[index][i] = (x, table[index][i].value + d); // Increment existing value
+                return;
+            }
+        }
+        table[index].Add((x, d)); // Add new key-value pair with increment
+
+    }
+}
+
 public static class StreamGenerator
 {
     public static IEnumerable<Tuple<ulong, int>> CreateStream(int n, int l)
@@ -80,9 +143,10 @@ public static class StreamGenerator
             yield return Tuple.Create(x & (((1UL << l) - 1UL) << 30), 1);
         }
     }
-    
 
-    public static void BenchmarkHashFunctions(int n, int l){
+
+    public static void BenchmarkHashFunctions(int n, int l)
+    {
 
         var rnd = new Random();
         ulong a = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
@@ -123,21 +187,41 @@ public static class StreamGenerator
 
 public class Program
 {
-    public static void Main(string[] args){
-    // Demonstrér funktionerne
-    ulong x = 12345678901234567890UL;
-    ulong a = 1234567890123UL;
-    ulong b = 987654321098UL;
-    int l = 16;
+    public static void Main(string[] args)
+    {
+        ulong x = 12345678901234567890UL;
+        ulong a = 1234567890123UL;
+        ulong b = 987654321098UL;
+        int l = 16;
 
-    ulong hash1 = HashFunctions.MultiplyShift(x, a, l);
-    Console.WriteLine($"MultiplyShift Hash: {hash1}");
+        ulong hash1 = HashFunctions.MultiplyShift(x, a, l);
+        Console.WriteLine($"MultiplyShift Hash: {hash1}");
 
-    ulong hash2 = HashFunctions.MultiplyModP(x, a, b, l);
-    Console.WriteLine($"MultiplyModP Hash: {hash2}");
+        ulong hash2 = HashFunctions.MultiplyModP(x, a, b, l);
+        Console.WriteLine($"MultiplyModP Hash: {hash2}");
 
-    // Benchmark
-    Console.WriteLine("\nBenchmarking hash functions:");
-    StreamGenerator.BenchmarkHashFunctions(10000000, 16);
+        // Benchmark
+        Console.WriteLine("\nBenchmarking hash functions:");
+        StreamGenerator.BenchmarkHashFunctions(10000000, 16);
+    
+
+        Console.WriteLine("\nTesting HashTableChaining (basic test):");
+
+        // Use multiplyShift hash function with a random odd number
+        ulong aHash = ((ulong)(uint)new Random().Next() << 32) | (ulong)(uint)new Random().Next();
+        Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyShift(x, aHash | 1UL, l);
+
+        // Create HashTableChaining instance
+        var table = new HashTableChaining(hashFunc, l);
+
+        // Simpel test: tilføj og hent nøgler
+        table.Increment(42UL, 5);
+        table.Increment(42UL, 3);
+        table.Increment(13UL, 1);
+
+        Console.WriteLine($"Value for key 42: {table.Get(42UL)} (Expected: 8)");
+        Console.WriteLine($"Value for key 13: {table.Get(13UL)} (Expected: 1)");
+        Console.WriteLine($"Value for unknown key 99: {table.Get(99UL)} (Expected: 0)");
+
     }
 }
