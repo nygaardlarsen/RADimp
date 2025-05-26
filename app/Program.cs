@@ -24,14 +24,17 @@ public static class HashFunctions
         // Since we can't represent 2^89 directly, we'll use BigInteger
         var p = (BigInteger.One << q) - 1;
 
-        // Compute hash = (a * x + b) mod p
-        BigInteger bigA = new BigInteger(a);
-        BigInteger bigX = new BigInteger(x);
-        BigInteger bigB = new BigInteger(b);
+        // // Compute hash = (a * x + b) mod p
+        // BigInteger bigA = new BigInteger(a);
+        // BigInteger bigX = new BigInteger(x);
+        // BigInteger bigB = new BigInteger(b);
 
-        BigInteger result = (bigA * bigX + bigB);
+        BigInteger result = a * x + b;
+
+        // BigInteger result = (bigA * bigX + bigB);
 
         // Efficient mod p where p = 2^q - 1
+        // result = result % p;
         result = (result & p) + (result >> q);
         if (result >= p)
             result -= p;
@@ -40,7 +43,6 @@ public static class HashFunctions
         ulong final = (ulong)(result & ((1UL << l) - 1));
         return final;
     }
-
 }
 
 public class HashTableChaining
@@ -202,8 +204,8 @@ public class Program
 
         // Benchmark
         Console.WriteLine("\nBenchmarking hash functions:");
-        StreamGenerator.BenchmarkHashFunctions(10000000, 16);
-    
+        StreamGenerator.BenchmarkHashFunctions(1000000, 16);
+
 
         Console.WriteLine("\nTesting HashTableChaining (basic test):");
 
@@ -218,10 +220,17 @@ public class Program
         table.Increment(42UL, 5);
         table.Increment(42UL, 3);
         table.Increment(13UL, 1);
+        // Test Set method
 
         Console.WriteLine($"Value for key 42: {table.Get(42UL)} (Expected: 8)");
         Console.WriteLine($"Value for key 13: {table.Get(13UL)} (Expected: 1)");
+
+        table.Set(42UL, 100);
+        table.Set(13UL, 50);
+
+
         Console.WriteLine($"Value for unknown key 99: {table.Get(99UL)} (Expected: 0)");
+        Console.WriteLine($"Value for key 42 after Set: {table.Get(42UL)} (Expected: 100)");
 
     }
 }
