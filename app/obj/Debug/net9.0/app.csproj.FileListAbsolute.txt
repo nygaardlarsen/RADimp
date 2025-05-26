@@ -27,3 +27,18 @@ C:\Users\thoma\OneDrive\Dokumenter\KU\ModComp\1803\RADimp\app\obj\Debug\net9.0\r
 C:\Users\thoma\OneDrive\Dokumenter\KU\ModComp\1803\RADimp\app\obj\Debug\net9.0\app.pdb
 C:\Users\thoma\OneDrive\Dokumenter\KU\ModComp\1803\RADimp\app\obj\Debug\net9.0\app.genruntimeconfig.cache
 C:\Users\thoma\OneDrive\Dokumenter\KU\ModComp\1803\RADimp\app\obj\Debug\net9.0\ref\app.dll
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\bin\Debug\net9.0\app.exe
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\bin\Debug\net9.0\app.deps.json
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\bin\Debug\net9.0\app.runtimeconfig.json
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\bin\Debug\net9.0\app.dll
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\bin\Debug\net9.0\app.pdb
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.AssemblyInfoInputs.cache
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.AssemblyInfo.cs
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.csproj.CoreCompileInputs.cache
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.sourcelink.json
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.dll
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\refint\app.dll
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.pdb
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\app.genruntimeconfig.cache
+C:\Users\CoolD\OneDrive\Desktop\KU\Blok 4 2024-2025\RAD\Afleveringer\Implementeringsprojekt\RADimp\app\obj\Debug\net9.0\ref\app.dll

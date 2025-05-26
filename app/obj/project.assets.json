@@ -8,19 +8,19 @@
     "net9.0": []
   },
   "packageFolders": {
-    "C:\\Users\\thoma\\.nuget\\packages\\": {}
+    "C:\\Users\\CoolD\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\ModComp\\1803\\RADimp\\app\\app.csproj",
+      "projectUniqueName": "C:\\Users\\CoolD\\OneDrive\\Desktop\\KU\\Blok 4 2024-2025\\RAD\\Afleveringer\\Implementeringsprojekt\\RADimp\\app\\app.csproj",
       "projectName": "app",
-      "projectPath": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\ModComp\\1803\\RADimp\\app\\app.csproj",
-      "packagesPath": "C:\\Users\\thoma\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\thoma\\OneDrive\\Dokumenter\\KU\\ModComp\\1803\\RADimp\\app\\obj\\",
+      "projectPath": "C:\\Users\\CoolD\\OneDrive\\Desktop\\KU\\Blok 4 2024-2025\\RAD\\Afleveringer\\Implementeringsprojekt\\RADimp\\app\\app.csproj",
+      "packagesPath": "C:\\Users\\CoolD\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\CoolD\\OneDrive\\Desktop\\KU\\Blok 4 2024-2025\\RAD\\Afleveringer\\Implementeringsprojekt\\RADimp\\app\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\thoma\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\CoolD\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
