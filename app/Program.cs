@@ -82,10 +82,11 @@ public static class HashFunctions
 
         // We use g(x) to define two hash functions:
         // h(x) = g(x) mod m
-        Func<ulong, int> h = x => (int)(g(x) & (m - 1)); // according to algorithm 2, second moment estimation
+        Func<ulong, int> h = x => (int)(g(x) & (m - 1)); // according to algorithm 2 specified in second moment estimation
 
-        // s(x) = g(x) mod 2^t
-         Func<ulong, int> s = x => ((g(x) >> (q - 1)) & 1) == 0 ? 1 : -1;
+        // s(x) = 1 - 2g(x)  
+         Func<ulong, int> s = x => ((g(x) >> (q - 1)) & 1) == 0 ? 1 : -1;  // according to algorithm 2 specified in second moment estimation
+        // s(x) = 1 if g(x) is even, -1 if g(x) is odd
 
         return (h, s);
 
@@ -288,6 +289,52 @@ public static class Estimators
     }
 }
 
+public static class CountSketch
+{
+    private static int[]? C;
+    private static Func<ulong, int>? h;
+    private static Func<ulong, int>? s;
+
+    // Given a stream of (key, delta) pairs, where key is a ulong and delta is an int,
+    // this method runs the CountSketch algorithm to estimate the frequency of each key.
+    public static void Run(IEnumerable<Tuple<ulong, int>> stream, int t)
+    {
+        int m = 1 << t;
+        C = new int[m];
+        (h, s) = HashFunctions.HashGenerator(t);
+
+        foreach (var (x, d) in stream)
+        {
+            C[h(x)] += s(x) * d;
+        }
+    }
+
+    // Returns the estimated frequency of the key x.
+    public static int EstimateFrequency(ulong x)
+    {
+        if (C == null || h == null || s == null)
+            throw new InvalidOperationException("CountSketch has not been initialized. Call Run() first.");
+
+        return s(x) * C[h(x)];
+    }
+
+    // Returns the estimated square sum of the frequencies of all keys.
+    public static ulong EstimateSquareSum()
+    {
+        if (C == null)
+            throw new InvalidOperationException("CountSketch has not been initialized. Call Run() first.");
+
+        ulong sum = 0;
+        foreach (int count in C)
+        {
+            sum += (ulong)(count * count);
+        }
+        return sum;
+    }
+}
+
+
+
 
 
 // TEST PROGRAM
@@ -298,7 +345,7 @@ public class Program
         ulong x = 12345678901234567890UL;
         ulong a = 1234567890123UL;
         ulong b = 987654321098UL;
-        int l = 16;
+        int l = 20;
 
         ulong hash1 = HashFunctions.MultiplyShift(x, a, l);
         Console.WriteLine($"MultiplyShift Hash: {hash1}");
@@ -348,17 +395,49 @@ public class Program
 
         for (ulong c = 0; c < 10; c++)
         {
-
             BigInteger gx = HashFunctions.Degree3Polynomial(c, a0, a1, a2, a3);
             Console.WriteLine($"g({c}) = {gx}");
         }
 
-        int t = 20; // Example value for t
+        int t = 10; // Example value for t
         var (h, s) = HashFunctions.HashGenerator(t);
         Console.WriteLine($"\nHash functions generated for t={t}:");
         for (ulong i = 0; i < 10; i++)
         {
             Console.WriteLine($"h({i}) = {h(i)}, s({i}) = {s(i)}");
         }
+
+        int n = 1000000; // Example size of the stream
+        var stream = StreamGenerator.CreateStream(n, l).ToList();
+
+        Console.WriteLine("⚙️ Running Count Sketch...");
+        CountSketch.Run(stream, t);
+        ulong S_est = CountSketch.EstimateSquareSum();
+
+        Console.WriteLine("✅ Estimating SquareSum (S) with CountSketch:");
+        Console.WriteLine($"SquareSum Countsketch = {S_est}");
+
+        Console.WriteLine("📏 Computing exact S with chaining...");
+        ulong S_exact = Estimators.ComputeSquareSum(stream, hashFunc, l);
+
+        Console.WriteLine("🎯 Exact SquareSum (S):");
+        Console.WriteLine($"Exact SquareSum = {S_exact}");
+
+        // Error calculation
+        double relativeError = Math.Abs((double)S_est - S_exact) / S_exact;
+        Console.WriteLine($"📉 Relative error: {relativeError:P2}");
+
+        ulong testKey = stream[0].Item1;
+        int fx_est = CountSketch.EstimateFrequency(testKey);
+
+        long fx_true = 0;
+        foreach (var (key, value) in stream)
+        {
+            if (key == testKey)
+                fx_true += value;
+        }
+
+        Console.WriteLine($"🔍 Estimated f({testKey}) = {fx_est}, exact = {fx_true}");
+
     }
 }
