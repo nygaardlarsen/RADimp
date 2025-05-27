@@ -9,6 +9,8 @@ public static class HashFunctions
     private static readonly int q = 89;
     private static readonly BigInteger p = (BigInteger.One << q) - 1;
 
+
+    // EXERCISE 1
     public static ulong MultiplyShift(ulong x, ulong a, int l)
     {
         if (l <= 0 || l >= 64)
@@ -17,6 +19,8 @@ public static class HashFunctions
         a |= 1UL; // ensure a is odd
         return (a * x) >> (64 - l);
     }
+
+    // EXERCISE 1
     public static ulong MultiplyModP(ulong x, ulong a, ulong b, int l)
     {
         if (l <= 0 || l > 64)
@@ -24,14 +28,14 @@ public static class HashFunctions
 
         BigInteger result = a * x + b;
 
-        result = (result & p) + (result >> q); // f(x) = (a * x + b) mod p
-        if (result >= p)
-            result -= p;
+        result = Reduce(result); // f(x) = (a * x + b) mod p
 
         // Final hash = result mod 2^l
         return (ulong)(result & ((1UL << l) - 1)); // f(x) = ((a * x + b) mod p) mod 2^l
     }
-    public static BigInteger GHash(ulong x, BigInteger a0, BigInteger a1, BigInteger a2, BigInteger a3)
+
+    // EXERCISE 4   
+    public static BigInteger Degree3Polynomial(ulong x, BigInteger a0, BigInteger a1, BigInteger a2, BigInteger a3)
     {
         BigInteger bx = new BigInteger(x);
 
@@ -59,8 +63,37 @@ public static class HashFunctions
         bytes[^1] &= 0b00011111; // trim til 89 bits
         return new BigInteger(bytes) % p;
     }
+
+    // EXERCISE 5
+    public static (Func<ulong, int> h, Func<ulong, int> s) HashGenerator(int t)
+    {
+
+        if (t <= 0 || t > 64)
+            throw new ArgumentOutOfRangeException(nameof(t), "Parameter 't' must be between 1 and 64.");
+        ulong m = 1UL << t; // m = 2^t
+
+        BigInteger a0 = RandomCoeff();
+        BigInteger a1 = RandomCoeff();
+        BigInteger a2 = RandomCoeff();
+        BigInteger a3 = RandomCoeff();
+
+        // g(x) = a3 * x^3 + a2 * x^2 + a1 * x + a0 mod p - 4-universal hashfunction
+        Func<ulong, BigInteger> g = x => Degree3Polynomial(x, a0, a1, a2, a3);
+
+        // We use g(x) to define two hash functions:
+        // h(x) = g(x) mod m
+        Func<ulong, int> h = x => (int)(g(x) & (m - 1)); // according to algorithm 2, second moment estimation
+
+        // s(x) = g(x) mod 2^t
+         Func<ulong, int> s = x => ((g(x) >> (q - 1)) & 1) == 0 ? 1 : -1;
+
+        return (h, s);
+
+    }
 }
 
+
+// EXERCISE 2
 public class HashTableChaining
 {
     private readonly int l;
@@ -126,6 +159,7 @@ public class HashTableChaining
     }
 }
 
+// EXERCISE 1
 public static class StreamGenerator
 {
     public static IEnumerable<Tuple<ulong, int>> CreateStream(int n, int l)
@@ -201,6 +235,8 @@ public static class StreamGenerator
     }
 }
 
+
+// EXERCISE 3
 public static class Estimators
 {
     public static ulong ComputeSquareSum(IEnumerable<Tuple<ulong, int>> stream, Func<ulong, ulong> hashFunc, int l)
@@ -222,7 +258,7 @@ public static class Estimators
 
         return sum;
     }
-    
+
     public static void BenchmarkSquareSum(int n, int l)
     {
         var rnd = new Random();
@@ -249,10 +285,12 @@ public static class Estimators
         Console.WriteLine($"[n={n}, l={l}]");
         Console.WriteLine($"MultiplyShift:   S = {sumShift}, Time = {sw1.ElapsedMilliseconds} ms");
         Console.WriteLine($"MultiplyModP:    S = {sumModP}, Time = {sw2.ElapsedMilliseconds} ms");
-    }   
+    }
 }
 
 
+
+// TEST PROGRAM
 public class Program
 {
     public static void Main(string[] args)
@@ -310,9 +348,17 @@ public class Program
 
         for (ulong c = 0; c < 10; c++)
         {
-            
-            BigInteger gx = HashFunctions.GHash(c, a0, a1, a2, a3);
+
+            BigInteger gx = HashFunctions.Degree3Polynomial(c, a0, a1, a2, a3);
             Console.WriteLine($"g({c}) = {gx}");
+        }
+
+        int t = 20; // Example value for t
+        var (h, s) = HashFunctions.HashGenerator(t);
+        Console.WriteLine($"\nHash functions generated for t={t}:");
+        for (ulong i = 0; i < 10; i++)
+        {
+            Console.WriteLine($"h({i}) = {h(i)}, s({i}) = {s(i)}");
         }
     }
 }
