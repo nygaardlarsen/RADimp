@@ -6,6 +6,9 @@ using System.Diagnostics;
 
 public static class HashFunctions
 {
+    private static readonly int q = 89;
+    private static readonly BigInteger p = (BigInteger.One << q) - 1;
+
     public static ulong MultiplyShift(ulong x, ulong a, int l)
     {
         if (l <= 0 || l >= 64)
@@ -19,29 +22,42 @@ public static class HashFunctions
         if (l <= 0 || l > 64)
             throw new ArgumentOutOfRangeException(nameof(l), "l must be in the range (0, 64]");
 
-        // Define p = 2^89 - 1, so q = 89
-        int q = 89;
-        // Since we can't represent 2^89 directly, we'll use BigInteger
-        var p = (BigInteger.One << q) - 1;
-
-        // // Compute hash = (a * x + b) mod p
-        // BigInteger bigA = new BigInteger(a);
-        // BigInteger bigX = new BigInteger(x);
-        // BigInteger bigB = new BigInteger(b);
-
         BigInteger result = a * x + b;
 
-        // BigInteger result = (bigA * bigX + bigB);
-
-        // Efficient mod p where p = 2^q - 1
-        // result = result % p;
-        result = (result & p) + (result >> q);
+        result = (result & p) + (result >> q); // f(x) = (a * x + b) mod p
         if (result >= p)
             result -= p;
 
         // Final hash = result mod 2^l
-        ulong final = (ulong)(result & ((1UL << l) - 1));
-        return final;
+        return (ulong)(result & ((1UL << l) - 1)); // f(x) = ((a * x + b) mod p) mod 2^l
+    }
+    public static BigInteger GHash(ulong x, BigInteger a0, BigInteger a1, BigInteger a2, BigInteger a3)
+    {
+        BigInteger bx = new BigInteger(x);
+
+        // Horner's rule: (((a3 * x + a2) * x + a1) * x + a0) mod p
+        BigInteger y = a3;
+        y = Reduce(y * bx + a2);
+        y = Reduce(y * bx + a1);
+        y = Reduce(y * bx + a0);
+
+        return y;
+    }
+
+    private static BigInteger Reduce(BigInteger y)
+    {
+        y = (y & p) + (y >> q);
+        if (y >= p) y -= p;
+        return y;
+    }
+
+    public static BigInteger RandomCoeff()
+    {
+        var rnd = new Random();
+        byte[] bytes = new byte[12]; // 96 bits
+        rnd.NextBytes(bytes);
+        bytes[^1] &= 0b00011111; // trim til 89 bits
+        return new BigInteger(bytes) % p;
     }
 }
 
@@ -158,30 +174,27 @@ public static class StreamGenerator
 
 
         // Generate datastream
-        var stream1 = StreamGenerator.CreateStream(n, l);
+        var stream = StreamGenerator.CreateStream(n, l).ToList();
 
         // MultiplyShift
         var sw1 = System.Diagnostics.Stopwatch.StartNew();
         ulong sumShift = 0;
-        foreach (var (key, _) in stream1)
+        foreach (var (key, _) in stream)
         {
             sumShift += HashFunctions.MultiplyShift(key, a, l);
         }
         sw1.Stop();
 
-        // Generate datastream again
-        var stream2 = StreamGenerator.CreateStream(n, l);
-
         // MultiplyModP
         var sw2 = System.Diagnostics.Stopwatch.StartNew();
         ulong sumModP = 0;
-        foreach (var (key, _) in stream2)
+        foreach (var (key, _) in stream)
         {
             sumModP += HashFunctions.MultiplyModP(key, a, b, l);
         }
         sw2.Stop();
 
-        // Print resultater
+        // Print results
         Console.WriteLine($"n = {n}, l = {l}");
         Console.WriteLine($"MultiplyShift:   Sum = {sumShift}, Time = {sw1.ElapsedMilliseconds} ms");
         Console.WriteLine($"MultiplyModP:    Sum = {sumModP}, Time = {sw2.ElapsedMilliseconds} ms");
@@ -212,34 +225,31 @@ public static class Estimators
     
     public static void BenchmarkSquareSum(int n, int l)
     {
-        
-    var rnd = new Random();
-    ulong a = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
-    ulong b = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
+        var rnd = new Random();
+        ulong a = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
+        ulong b = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
 
-    // Create data stream
-    var stream1 = StreamGenerator.CreateStream(n, l);
-    var stream2 = StreamGenerator.CreateStream(n, l); // to avoid reusing enumerator
+        // Create data stream
+        var stream1 = StreamGenerator.CreateStream(n, l);
+        var stream2 = StreamGenerator.CreateStream(n, l); // to avoid reusing enumerator
 
-    // MultiplyShift
-    Func<ulong, ulong> hashShift = x => HashFunctions.MultiplyShift(x, a | 1UL, l);
-    var sw1 = Stopwatch.StartNew();
-    ulong sumShift = ComputeSquareSum(stream1, hashShift, l);
-    sw1.Stop();
+        // MultiplyShift
+        Func<ulong, ulong> hashShift = x => HashFunctions.MultiplyShift(x, a | 1UL, l);
+        var sw1 = Stopwatch.StartNew();
+        ulong sumShift = ComputeSquareSum(stream1, hashShift, l);
+        sw1.Stop();
 
-    // MultiplyModP
-    Func<ulong, ulong> hashModP = x => HashFunctions.MultiplyModP(x, a, b, l);
-    var sw2 = Stopwatch.StartNew();
-    ulong sumModP = ComputeSquareSum(stream2, hashModP, l);
-    sw2.Stop();
+        // MultiplyModP
+        Func<ulong, ulong> hashModP = x => HashFunctions.MultiplyModP(x, a, b, l);
+        var sw2 = Stopwatch.StartNew();
+        ulong sumModP = ComputeSquareSum(stream2, hashModP, l);
+        sw2.Stop();
 
-    // Output
-    Console.WriteLine($"[n={n}, l={l}]");
-    Console.WriteLine($"MultiplyShift:   S = {sumShift}, Time = {sw1.ElapsedMilliseconds} ms");
-    Console.WriteLine($"MultiplyModP:    S = {sumModP}, Time = {sw2.ElapsedMilliseconds} ms");
-}
-
-
+        // Output
+        Console.WriteLine($"[n={n}, l={l}]");
+        Console.WriteLine($"MultiplyShift:   S = {sumShift}, Time = {sw1.ElapsedMilliseconds} ms");
+        Console.WriteLine($"MultiplyModP:    S = {sumModP}, Time = {sw2.ElapsedMilliseconds} ms");
+    }   
 }
 
 
@@ -288,11 +298,21 @@ public class Program
         Console.WriteLine($"Value for unknown key 99: {table.Get(99UL)} (Expected: 0)");
         Console.WriteLine($"Value for key 42 after Set: {table.Get(42UL)} (Expected: 100)");
 
-        foreach (int l_value in new int[] { 8, 10, 12, 14, 16 })
+        foreach (int l_value in new int[] { 2, 4, 6 })
         {
             Estimators.BenchmarkSquareSum(1000000, l_value);
         }
 
+        BigInteger a0 = HashFunctions.RandomCoeff();
+        BigInteger a1 = HashFunctions.RandomCoeff();
+        BigInteger a2 = HashFunctions.RandomCoeff();
+        BigInteger a3 = HashFunctions.RandomCoeff();
 
+        for (ulong c = 0; c < 10; c++)
+        {
+            
+            BigInteger gx = HashFunctions.GHash(c, a0, a1, a2, a3);
+            Console.WriteLine($"g({c}) = {gx}");
+        }
     }
 }
