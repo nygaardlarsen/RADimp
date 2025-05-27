@@ -51,6 +51,8 @@ public class HashTableChaining
     private readonly int tableSize;
     private readonly List<(ulong key, long value)>[] table;
     private readonly Func<ulong, ulong> hashFunction;
+    public List<(ulong key, long value)>[] Buckets => table;
+
     public HashTableChaining(Func<ulong, ulong> hashFunction, int l)
     {
         this.l = l;
@@ -186,6 +188,60 @@ public static class StreamGenerator
     }
 }
 
+public static class Estimators
+{
+    public static ulong ComputeSquareSum(IEnumerable<Tuple<ulong, int>> stream, Func<ulong, ulong> hashFunc, int l)
+    {
+        var table = new HashTableChaining(hashFunc, l);
+        ulong sum = 0;
+        foreach (var (key, value) in stream)
+        {
+            table.Increment(key, value);
+        }
+
+        foreach (var bucket in table.Buckets)
+        {
+            foreach (var (_, value) in bucket)
+            {
+                sum += (ulong)(value * value); // OBS: cast for at undgå overflow
+            }
+        }
+
+        return sum;
+    }
+    
+    public static void BenchmarkSquareSum(int n, int l)
+    {
+        
+    var rnd = new Random();
+    ulong a = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
+    ulong b = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
+
+    // Create data stream
+    var stream1 = StreamGenerator.CreateStream(n, l);
+    var stream2 = StreamGenerator.CreateStream(n, l); // to avoid reusing enumerator
+
+    // MultiplyShift
+    Func<ulong, ulong> hashShift = x => HashFunctions.MultiplyShift(x, a | 1UL, l);
+    var sw1 = Stopwatch.StartNew();
+    ulong sumShift = ComputeSquareSum(stream1, hashShift, l);
+    sw1.Stop();
+
+    // MultiplyModP
+    Func<ulong, ulong> hashModP = x => HashFunctions.MultiplyModP(x, a, b, l);
+    var sw2 = Stopwatch.StartNew();
+    ulong sumModP = ComputeSquareSum(stream2, hashModP, l);
+    sw2.Stop();
+
+    // Output
+    Console.WriteLine($"[n={n}, l={l}]");
+    Console.WriteLine($"MultiplyShift:   S = {sumShift}, Time = {sw1.ElapsedMilliseconds} ms");
+    Console.WriteLine($"MultiplyModP:    S = {sumModP}, Time = {sw2.ElapsedMilliseconds} ms");
+}
+
+
+}
+
 
 public class Program
 {
@@ -231,6 +287,12 @@ public class Program
 
         Console.WriteLine($"Value for unknown key 99: {table.Get(99UL)} (Expected: 0)");
         Console.WriteLine($"Value for key 42 after Set: {table.Get(42UL)} (Expected: 100)");
+
+        foreach (int l_value in new int[] { 8, 10, 12, 14, 16 })
+        {
+            Estimators.BenchmarkSquareSum(1000000, l_value);
+        }
+
 
     }
 }
