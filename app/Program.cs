@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Microsoft.VisualBasic;
 
 
 public static class HashFunctions
@@ -21,17 +22,22 @@ public static class HashFunctions
     }
 
     // EXERCISE 1
-    public static ulong MultiplyModP(ulong x, ulong a, ulong b, int l)
+    public static ulong MultiplyModP(BigInteger x, BigInteger a, BigInteger b, int l)
     {
         if (l <= 0 || l > 64)
             throw new ArgumentOutOfRangeException(nameof(l), "l must be in the range (0, 64]");
 
         BigInteger result = a * x + b;
+        result = Reduce(result);
 
-        result = Reduce(result); // f(x) = (a * x + b) mod p
+    
 
-        // Final hash = result mod 2^l
-        return (ulong)(result & ((1UL << l) - 1)); // f(x) = ((a * x + b) mod p) mod 2^l
+        // result = Reduce(result); // f(x) = (a * x + b) mod p
+
+        // Console.WriteLine($"MultiplyModP: result after reduction = {result}");
+        // // Final hash = result mod 2^l
+        return (ulong)(result & ((1UL << l) - 1)); // ensure result is within p
+
     }
 
     // EXERCISE 4   
@@ -146,6 +152,7 @@ public class HashTableChaining
 
     public void Increment(ulong x, long d)
     {
+
         int index = Index(x);
         for (int i = 0; i < table[index].Count; i++)
         {
@@ -157,6 +164,28 @@ public class HashTableChaining
         }
         table[index].Add((x, d)); // Add new key-value pair with increment
 
+    }
+
+        public static void TestCollisionHandling()
+    {
+        // Dummy hashfunction that always returns 0
+        Func<ulong, ulong> constantHash = x => 0;
+
+        int l = 16;
+        var table = new HashTableChaining(constantHash, l);
+
+        // insert some values that will collide
+        table.Set(100UL, 1);
+        table.Set(200UL, 2);
+        table.Set(300UL, 3);
+        
+        foreach (var bucket in table.Buckets)
+        {
+            foreach (var (key, value) in bucket)
+            {
+                Console.WriteLine($"Key: {key}, Hashed: {constantHash(key)}, Value: {value}");
+            }
+        }
     }
 }
 
@@ -204,8 +233,10 @@ public static class StreamGenerator
     {
 
         var rnd = new Random();
-        ulong a = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
-        ulong b = ((ulong)(uint)rnd.Next() << 32) | (ulong)(uint)rnd.Next();
+        BigInteger a = HashFunctions.RandomCoeff();
+        BigInteger b = HashFunctions.RandomCoeff();
+
+        ulong aShift = (ulong)(a & ((1UL << 31) - 1)); // ensure a is odd
 
 
         // Generate datastream
@@ -216,7 +247,7 @@ public static class StreamGenerator
         ulong sumShift = 0;
         foreach (var (key, _) in stream)
         {
-            sumShift += HashFunctions.MultiplyShift(key, a, l);
+            sumShift += HashFunctions.MultiplyShift(key, aShift, l);
         }
         sw1.Stop();
 
@@ -240,7 +271,7 @@ public static class StreamGenerator
 // EXERCISE 3
 public static class Estimators
 {
-    public static ulong ComputeSquareSum(IEnumerable<Tuple<ulong, int>> stream, Func<ulong, ulong> hashFunc, int l)
+    public static (ulong sum, HashTableChaining table) ComputeSquareSum(IEnumerable<Tuple<ulong, int>> stream, Func<ulong, ulong> hashFunc, int l)
     {
         var table = new HashTableChaining(hashFunc, l);
         ulong sum = 0;
@@ -257,8 +288,31 @@ public static class Estimators
             }
         }
 
-        return sum;
+        return (sum, table);
     }
+
+        public static int CountCollisions(HashTableChaining table)
+    {
+        int collisions = 0;
+        foreach (var bucket in table.Buckets)
+        {
+            if (bucket.Count > 1)
+                collisions += bucket.Count - 1; // hver ekstra entry i bucket = én kollision
+        }
+        return collisions;
+    }
+
+        public static int CountUsedBuckets(HashTableChaining table)
+    {
+        int used = 0;
+        foreach (var bucket in table.Buckets)
+        {
+            if (bucket.Count > 0) used++;
+        }
+        return used;
+    }
+
+
 
     public static void BenchmarkSquareSum(int n, int l)
     {
@@ -271,21 +325,37 @@ public static class Estimators
         var stream2 = StreamGenerator.CreateStream(n, l); // to avoid reusing enumerator
 
         // MultiplyShift
+
+        // Console.WriteLine($"\n\n\nBenchmarking with MultiplyShift\n\n\n");
+
         Func<ulong, ulong> hashShift = x => HashFunctions.MultiplyShift(x, a | 1UL, l);
         var sw1 = Stopwatch.StartNew();
-        ulong sumShift = ComputeSquareSum(stream1, hashShift, l);
+        var (sumShift, tableShift) = ComputeSquareSum(stream1, hashShift, l);
         sw1.Stop();
+
+        // Console.WriteLine($"\n\n\nBenchmarking with MultiplyModP\n\n\n");
 
         // MultiplyModP
         Func<ulong, ulong> hashModP = x => HashFunctions.MultiplyModP(x, a, b, l);
         var sw2 = Stopwatch.StartNew();
-        ulong sumModP = ComputeSquareSum(stream2, hashModP, l);
+        var (sumModP, tableModP) = ComputeSquareSum(stream2, hashModP, l);
         sw2.Stop();
+
+        int collisionsShift = CountCollisions(tableShift); // du skal gemme `tableShift` fra ComputeSquareSum
+        int collisionsModP = CountCollisions(tableModP);  // og tilsvarende for ModP
+        int usedBucketsShift = CountUsedBuckets(tableShift);
+        int usedBucketsModP = CountUsedBuckets(tableModP);
+
 
         // Output
         Console.WriteLine($"[n={n}, l={l}]");
         Console.WriteLine($"MultiplyShift:   S = {sumShift}, Time = {sw1.ElapsedMilliseconds} ms");
         Console.WriteLine($"MultiplyModP:    S = {sumModP}, Time = {sw2.ElapsedMilliseconds} ms");
+        Console.WriteLine($"MultiplyShift collisions: {collisionsShift}");
+        Console.WriteLine($"MultiplyModP  collisions: {collisionsModP}");
+        Console.WriteLine($"Total buckets: {1 << l}");
+        Console.WriteLine($"MultiplyShift used buckets: {usedBucketsShift}");
+        Console.WriteLine($"MultiplyModP  used buckets: {usedBucketsModP}");
     }
 }
 
@@ -341,87 +411,57 @@ public static class CountSketch
 public class Program
 {
     public static void Main(string[] args)
-    {
-        ulong x = 12345678901234567890UL;
-        ulong a = 1234567890123UL;
-        ulong b = 987654321098UL;
-        int l = 20;
+    {   
 
-        ulong hash1 = HashFunctions.MultiplyShift(x, a, l);
-        Console.WriteLine($"MultiplyShift Hash: {hash1}");
+        
+        HashTableChaining.TestCollisionHandling();
+        Console.WriteLine("✅ Collision handling test passed successfully.");
 
-        ulong hash2 = HashFunctions.MultiplyModP(x, a, b, l);
-        Console.WriteLine($"MultiplyModP Hash: {hash2}");
+        int n = 1000000; // Size of the stream
+        var l_list = Enumerable.Range(1, 11).Select(i => 2 * i).ToList(); // m = 2^l unique keys
 
-        // Benchmark
         Console.WriteLine("\nBenchmarking hash functions:");
-        StreamGenerator.BenchmarkHashFunctions(1000000, 16);
-
-
-        Console.WriteLine("\nTesting HashTableChaining (basic test):");
-
-        // Use multiplyShift hash function with a random odd number
-        ulong aHash = ((ulong)(uint)new Random().Next() << 32) | (ulong)(uint)new Random().Next();
-        Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyShift(x, aHash | 1UL, l);
-
-        // Create HashTableChaining instance
-        var table = new HashTableChaining(hashFunc, l);
-
-        // Simpel test: tilføj og hent nøgler
-        table.Increment(42UL, 5);
-        table.Increment(42UL, 3);
-        table.Increment(13UL, 1);
-        // Test Set method
-
-        Console.WriteLine($"Value for key 42: {table.Get(42UL)} (Expected: 8)");
-        Console.WriteLine($"Value for key 13: {table.Get(13UL)} (Expected: 1)");
-
-        table.Set(42UL, 100);
-        table.Set(13UL, 50);
-
-
-        Console.WriteLine($"Value for unknown key 99: {table.Get(99UL)} (Expected: 0)");
-        Console.WriteLine($"Value for key 42 after Set: {table.Get(42UL)} (Expected: 100)");
-
-        foreach (int l_value in new int[] { 2, 4, 6 })
+        foreach (var l_val in l_list)
         {
-            Estimators.BenchmarkSquareSum(1000000, l_value);
+            StreamGenerator.BenchmarkHashFunctions(n, l_val);
+
         }
 
-        BigInteger a0 = HashFunctions.RandomCoeff();
-        BigInteger a1 = HashFunctions.RandomCoeff();
-        BigInteger a2 = HashFunctions.RandomCoeff();
-        BigInteger a3 = HashFunctions.RandomCoeff();
-
-        for (ulong c = 0; c < 10; c++)
+        Console.WriteLine("\nTesting HashTableChaining collision handling:");
+        foreach (var l_val in l_list)
         {
-            BigInteger gx = HashFunctions.Degree3Polynomial(c, a0, a1, a2, a3);
-            Console.WriteLine($"g({c}) = {gx}");
+            Estimators.BenchmarkSquareSum(n, l_val);
         }
 
-        int t = 10; // Example value for t
-        var (h, s) = HashFunctions.HashGenerator(t);
-        Console.WriteLine($"\nHash functions generated for t={t}:");
-        for (ulong i = 0; i < 10; i++)
-        {
-            Console.WriteLine($"h({i}) = {h(i)}, s({i}) = {s(i)}");
-        }
+        int t = 10;
 
-        int n = 1000000; // Example size of the stream
+        int l = 16; // Example value for l
         var stream = StreamGenerator.CreateStream(n, l).ToList();
-
         Console.WriteLine("⚙️ Running Count Sketch...");
         CountSketch.Run(stream, t);
+
+        // Time EstimateSquareSum
+        var sw_est = Stopwatch.StartNew();
         ulong S_est = CountSketch.EstimateSquareSum();
+        sw_est.Stop();
 
         Console.WriteLine("✅ Estimating SquareSum (S) with CountSketch:");
         Console.WriteLine($"SquareSum Countsketch = {S_est}");
+        Console.WriteLine($"Time for EstimateSquareSum: {sw_est.ElapsedMilliseconds} ms");
 
+        BigInteger a0 = HashFunctions.RandomCoeff();
+        BigInteger a1 = HashFunctions.RandomCoeff();
+        Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyModP(x, a0, a1, l);
         Console.WriteLine("📏 Computing exact S with chaining...");
-        ulong S_exact = Estimators.ComputeSquareSum(stream, hashFunc, l);
+
+        // Time ComputeSquareSum
+        var sw_exact = Stopwatch.StartNew();
+        var (S_exact, table) = Estimators.ComputeSquareSum(stream, hashFunc, l);
+        sw_exact.Stop();
 
         Console.WriteLine("🎯 Exact SquareSum (S):");
         Console.WriteLine($"Exact SquareSum = {S_exact}");
+        Console.WriteLine($"Time for ComputeSquareSum: {sw_exact.ElapsedMilliseconds} ms");
 
         // Error calculation
         double relativeError = Math.Abs((double)S_est - S_exact) / S_exact;
@@ -434,10 +474,11 @@ public class Program
         foreach (var (key, value) in stream)
         {
             if (key == testKey)
-                fx_true += value;
+            fx_true += value;
         }
 
         Console.WriteLine($"🔍 Estimated f({testKey}) = {fx_est}, exact = {fx_true}");
+
 
     }
 }
