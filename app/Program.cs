@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.VisualBasic;
+using System.IO;
 
 
 public static class HashFunctions
@@ -247,7 +248,7 @@ public static class StreamGenerator
         ulong sumShift = 0;
         foreach (var (key, _) in stream)
         {
-            sumShift += HashFunctions.MultiplyShift(key, aShift, l);
+            sumShift += HashFunctions.MultiplyShift(key, aShift, l); // Irrelevant sum, just for benchmarking
         }
         sw1.Stop();
 
@@ -256,7 +257,7 @@ public static class StreamGenerator
         ulong sumModP = 0;
         foreach (var (key, _) in stream)
         {
-            sumModP += HashFunctions.MultiplyModP(key, a, b, l);
+            sumModP += HashFunctions.MultiplyModP(key, a, b, l); // Irrelevant sum, just for benchmarking
         }
         sw2.Stop();
 
@@ -284,7 +285,7 @@ public static class Estimators
         {
             foreach (var (_, value) in bucket)
             {
-                sum += (ulong)(value * value); // OBS: cast for at undgå overflow
+                sum += (ulong)(value * value); // Cast to avoid overflow
             }
         }
 
@@ -326,14 +327,10 @@ public static class Estimators
 
         // MultiplyShift
 
-        // Console.WriteLine($"\n\n\nBenchmarking with MultiplyShift\n\n\n");
-
         Func<ulong, ulong> hashShift = x => HashFunctions.MultiplyShift(x, a | 1UL, l);
         var sw1 = Stopwatch.StartNew();
         var (sumShift, tableShift) = ComputeSquareSum(stream1, hashShift, l);
         sw1.Stop();
-
-        // Console.WriteLine($"\n\n\nBenchmarking with MultiplyModP\n\n\n");
 
         // MultiplyModP
         Func<ulong, ulong> hashModP = x => HashFunctions.MultiplyModP(x, a, b, l);
@@ -404,16 +401,92 @@ public static class CountSketch
 }
 
 
+public static class Experiments
+{
+    // EXERCISE 7
+    public static void RunCountSketch(int n, int l, int t)
+    {
+        // Generate a stream of (key, delta) pairs
+
+        Console.WriteLine($"Exercise 7: Running CountSketch with n={n}, l={l}, t={t}");
+        var stream = StreamGenerator.CreateStream(n, l).ToList();
+
+        BigInteger a0 = HashFunctions.RandomCoeff();
+        BigInteger a1 = HashFunctions.RandomCoeff();
+        Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyModP(x, a0, a1, l);
+
+        var (ExactSum, table) = Estimators.ComputeSquareSum(stream, hashFunc, l); // Compute the exact square sum using chaining
+
+        List<ulong> estimates = new List<ulong>();
+        for (int i = 0; i < 100; i++)
+        {
+            if (i % 5 == 4)
+            {
+                Console.WriteLine($"🔄 Iteration {i + 1} of 100"); // ChatGPT suggested emojis :D
+            }
+            CountSketch.Run(stream, t);
+            ulong EstimatedSum = CountSketch.EstimateSquareSum(); // Estimate square sum using CountSketch
+            estimates.Add(EstimatedSum);
+        }
+
+        List<ulong> sortedEstimates = estimates.OrderBy(x => x).ToList();
+
+        // Print the MSE
+        double mse = estimates.Select(x => Math.Pow((double)x - (double)ExactSum, 2)).Average();
+        Console.WriteLine($"\n📉 Mean Square Error (MSE): {mse:F2}");
+
+        List<ulong> medians = new();
+        for (int g = 0; g < 9; g++)
+        {
+            var group = estimates.Skip(g * 11).Take(11).OrderBy(x => x).ToList(); // group of 11 estimates, sorted
+            medians.Add(group[5]); // 5th element is the median in a sorted list of 11 elements
+        }
+        medians.Sort();
+        Console.WriteLine("\nMedians from 9 groups:");
+        for (int i = 0; i < medians.Count; i++)
+        {
+            Console.WriteLine($"Median {i + 1}: {medians[i]}");
+        }
+        Console.WriteLine($"Exact square sum: {ExactSum}");
+
+        // Export to CSV
+        Console.WriteLine("\nExporting estimates and medians to CSV files, to plot in python...");
+        string estimatePath = "estimates.csv";
+        string header = "Index,EstimatedSquareSum";
+        SaveListToCsv(estimatePath, sortedEstimates, header, ExactSum);
+
+        string medianPath = "medians.csv";
+        string medianHeader = "Index,MedianSquareSum";
+        SaveListToCsv(medianPath, medians, medianHeader, ExactSum);
+
+        Console.WriteLine($"\nEstimates saved to {estimatePath}");
+        Console.WriteLine($"Medians saved to {medianPath}");
+
+    }
+    public static void SaveListToCsv(string path, IEnumerable<ulong> data, string header, ulong? exactSum = null)
+    {
+        using var writer = new StreamWriter(path);
+        writer.WriteLine(header);
+        int i = 1;
+        foreach (var x in data)
+        {
+            writer.WriteLine($"{i},{x}");
+            i++;
+        }
+        if (exactSum.HasValue) // If exactSum is provided, write it as the last line
+        {
+            writer.WriteLine($"-1,{exactSum.Value}");
+        }
+    }
+}
 
 
-
-// TEST PROGRAM
+// MAIN PROGRAM
 public class Program
 {
     public static void Main(string[] args)
-    {   
+    {
 
-        
         HashTableChaining.TestCollisionHandling();
         Console.WriteLine("✅ Collision handling test passed successfully.");
 
@@ -433,51 +506,53 @@ public class Program
             Estimators.BenchmarkSquareSum(n, l_val);
         }
 
-        int t = 10;
+        // int t = 10;
 
-        int l = 16; // Example value for l
-        var stream = StreamGenerator.CreateStream(n, l).ToList();
-        Console.WriteLine("⚙️ Running Count Sketch...");
-        CountSketch.Run(stream, t);
 
-        // Time EstimateSquareSum
-        var sw_est = Stopwatch.StartNew();
-        ulong S_est = CountSketch.EstimateSquareSum();
-        sw_est.Stop();
+        Experiments.RunCountSketch(n, 18, 10); // Example call to run CountSketch with n=1000000, l=16, t=10
+        // int l = 16; // Example value for l
+        // var stream = StreamGenerator.CreateStream(n, l).ToList();
+        // Console.WriteLine("⚙️ Running Count Sketch...");
+        // CountSketch.Run(stream, t);
 
-        Console.WriteLine("✅ Estimating SquareSum (S) with CountSketch:");
-        Console.WriteLine($"SquareSum Countsketch = {S_est}");
-        Console.WriteLine($"Time for EstimateSquareSum: {sw_est.ElapsedMilliseconds} ms");
+        // // Time EstimateSquareSum
+        // var sw_est = Stopwatch.StartNew();
+        // ulong S_est = CountSketch.EstimateSquareSum();
+        // sw_est.Stop();
 
-        BigInteger a0 = HashFunctions.RandomCoeff();
-        BigInteger a1 = HashFunctions.RandomCoeff();
-        Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyModP(x, a0, a1, l);
-        Console.WriteLine("📏 Computing exact S with chaining...");
+        // Console.WriteLine("✅ Estimating SquareSum (S) with CountSketch:");
+        // Console.WriteLine($"SquareSum Countsketch = {S_est}");
+        // Console.WriteLine($"Time for EstimateSquareSum: {sw_est.ElapsedMilliseconds} ms");
 
-        // Time ComputeSquareSum
-        var sw_exact = Stopwatch.StartNew();
-        var (S_exact, table) = Estimators.ComputeSquareSum(stream, hashFunc, l);
-        sw_exact.Stop();
+        // BigInteger a0 = HashFunctions.RandomCoeff();
+        // BigInteger a1 = HashFunctions.RandomCoeff();
+        // Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyModP(x, a0, a1, l);
+        // Console.WriteLine("📏 Computing exact S with chaining...");
 
-        Console.WriteLine("🎯 Exact SquareSum (S):");
-        Console.WriteLine($"Exact SquareSum = {S_exact}");
-        Console.WriteLine($"Time for ComputeSquareSum: {sw_exact.ElapsedMilliseconds} ms");
+        // // Time ComputeSquareSum
+        // var sw_exact = Stopwatch.StartNew();
+        // var (S_exact, table) = Estimators.ComputeSquareSum(stream, hashFunc, l);
+        // sw_exact.Stop();
 
-        // Error calculation
-        double relativeError = Math.Abs((double)S_est - S_exact) / S_exact;
-        Console.WriteLine($"📉 Relative error: {relativeError:P2}");
+        // Console.WriteLine("🎯 Exact SquareSum (S):");
+        // Console.WriteLine($"Exact SquareSum = {S_exact}");
+        // Console.WriteLine($"Time for ComputeSquareSum: {sw_exact.ElapsedMilliseconds} ms");
 
-        ulong testKey = stream[0].Item1;
-        int fx_est = CountSketch.EstimateFrequency(testKey);
+        // // Error calculation
+        // double relativeError = ((double)S_est - S_exact) / S_exact;
+        // Console.WriteLine($"📉 Relative error: {relativeError:P2}");
 
-        long fx_true = 0;
-        foreach (var (key, value) in stream)
-        {
-            if (key == testKey)
-            fx_true += value;
-        }
+        // ulong testKey = stream[0].Item1;
+        // int fx_est = CountSketch.EstimateFrequency(testKey);
 
-        Console.WriteLine($"🔍 Estimated f({testKey}) = {fx_est}, exact = {fx_true}");
+        // long fx_true = 0;
+        // foreach (var (key, value) in stream)
+        // {
+        //     if (key == testKey)
+        //         fx_true += value;
+        // }
+
+        // Console.WriteLine($"🔍 Estimated f({testKey}) = {fx_est}, exact = {fx_true}");
 
 
     }
