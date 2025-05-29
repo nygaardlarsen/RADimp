@@ -491,14 +491,13 @@ public class Program
         Console.WriteLine("✅ Collision handling test passed successfully.");
 
         int n = 1000000; // Size of the stream
-        var l_list = Enumerable.Range(1, 11).Select(i => 2 * i).ToList(); // m = 2^l unique keys
+        int maxL = 19; // Maximum value for l
+        // Ensure that 2^l <= n
 
-        Console.WriteLine("\nBenchmarking hash functions:");
-        foreach (var l_val in l_list)
-        {
-            StreamGenerator.BenchmarkHashFunctions(n, l_val);
+        var l_list = Enumerable.Range(1, maxL).ToList(); // m = 2^l unique keys
 
-        }
+        Console.WriteLine("\nExercise 1c: Benchmarking hash functions:");
+        StreamGenerator.BenchmarkHashFunctions(100000000, 10);
 
         Console.WriteLine("\nTesting HashTableChaining collision handling:");
         foreach (var l_val in l_list)
@@ -508,52 +507,7 @@ public class Program
 
         // int t = 10;
 
-
         Experiments.RunCountSketch(n, 18, 10); // Example call to run CountSketch with n=1000000, l=16, t=10
-        // int l = 16; // Example value for l
-        // var stream = StreamGenerator.CreateStream(n, l).ToList();
-        // Console.WriteLine("⚙️ Running Count Sketch...");
-        // CountSketch.Run(stream, t);
-
-        // // Time EstimateSquareSum
-        // var sw_est = Stopwatch.StartNew();
-        // ulong S_est = CountSketch.EstimateSquareSum();
-        // sw_est.Stop();
-
-        // Console.WriteLine("✅ Estimating SquareSum (S) with CountSketch:");
-        // Console.WriteLine($"SquareSum Countsketch = {S_est}");
-        // Console.WriteLine($"Time for EstimateSquareSum: {sw_est.ElapsedMilliseconds} ms");
-
-        // BigInteger a0 = HashFunctions.RandomCoeff();
-        // BigInteger a1 = HashFunctions.RandomCoeff();
-        // Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyModP(x, a0, a1, l);
-        // Console.WriteLine("📏 Computing exact S with chaining...");
-
-        // // Time ComputeSquareSum
-        // var sw_exact = Stopwatch.StartNew();
-        // var (S_exact, table) = Estimators.ComputeSquareSum(stream, hashFunc, l);
-        // sw_exact.Stop();
-
-        // Console.WriteLine("🎯 Exact SquareSum (S):");
-        // Console.WriteLine($"Exact SquareSum = {S_exact}");
-        // Console.WriteLine($"Time for ComputeSquareSum: {sw_exact.ElapsedMilliseconds} ms");
-
-        // // Error calculation
-        // double relativeError = ((double)S_est - S_exact) / S_exact;
-        // Console.WriteLine($"📉 Relative error: {relativeError:P2}");
-
-        // ulong testKey = stream[0].Item1;
-        // int fx_est = CountSketch.EstimateFrequency(testKey);
-
-        // long fx_true = 0;
-        // foreach (var (key, value) in stream)
-        // {
-        //     if (key == testKey)
-        //         fx_true += value;
-        // }
-
-        // Console.WriteLine($"🔍 Estimated f({testKey}) = {fx_est}, exact = {fx_true}");
-
 
     }
 }
