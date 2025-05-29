@@ -55,7 +55,7 @@ public static class HashFunctions
         return y;
     }
 
-    private static BigInteger Reduce(BigInteger y)
+    private static BigInteger Reduce(BigInteger y) // Reduce y modulo p, where p = 2^89 - 1
     {
         y = (y & p) + (y >> q);
         if (y >= p) y -= p;
@@ -75,6 +75,7 @@ public static class HashFunctions
     public static (Func<ulong, int> h, Func<ulong, int> s) HashGenerator(int t)
     {
 
+        // Use 4-universal hashing to generate two hash functions h and s
         if (t <= 0 || t > 64)
             throw new ArgumentOutOfRangeException(nameof(t), "Parameter 't' must be between 1 and 64.");
         ulong m = 1UL << t; // m = 2^t
@@ -167,6 +168,7 @@ public class HashTableChaining
 
     }
 
+        // Extra method to test collision handling
         public static void TestCollisionHandling()
     {
         // Dummy hashfunction that always returns 0
@@ -179,7 +181,7 @@ public class HashTableChaining
         table.Set(100UL, 1);
         table.Set(200UL, 2);
         table.Set(300UL, 3);
-        
+
         foreach (var bucket in table.Buckets)
         {
             foreach (var (key, value) in bucket)
@@ -233,7 +235,6 @@ public static class StreamGenerator
     public static void BenchmarkHashFunctions(int n, int l)
     {
 
-        var rnd = new Random();
         BigInteger a = HashFunctions.RandomCoeff();
         BigInteger b = HashFunctions.RandomCoeff();
 
@@ -406,10 +407,9 @@ public static class Experiments
     // EXERCISE 7
     public static void RunCountSketch(int n, int l, int t)
     {
-        // Generate a stream of (key, delta) pairs
 
         Console.WriteLine($"Exercise 7: Running CountSketch with n={n}, l={l}, t={t}");
-        var stream = StreamGenerator.CreateStream(n, l).ToList();
+        var stream = StreamGenerator.CreateStream(n, l).ToList(); // Create the data stream
 
         BigInteger a0 = HashFunctions.RandomCoeff();
         BigInteger a1 = HashFunctions.RandomCoeff();
@@ -463,6 +463,7 @@ public static class Experiments
         Console.WriteLine($"Medians saved to {medianPath}");
 
     }
+    // Extracting data to CSV for plotting in Python
     public static void SaveListToCsv(string path, IEnumerable<ulong> data, string header, ulong? exactSum = null)
     {
         using var writer = new StreamWriter(path);
@@ -479,7 +480,6 @@ public static class Experiments
         }
     }
 }
-
 
 // MAIN PROGRAM
 public class Program
