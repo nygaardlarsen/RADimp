@@ -31,7 +31,6 @@ public static class HashFunctions
         BigInteger result = a * x + b;
         result = Reduce(result);
 
-    
 
         // result = Reduce(result); // f(x) = (a * x + b) mod p
 
@@ -286,33 +285,35 @@ public static class Estimators
         {
             foreach (var (_, value) in bucket)
             {
+             
                 sum += (ulong)(value * value); // Cast to avoid overflow
             }
         }
+        // Console.WriteLine($"Chaining Number of buckets: {table.Buckets.Length}");
 
         return (sum, table);
     }
 
         public static int CountCollisions(HashTableChaining table)
-    {
-        int collisions = 0;
-        foreach (var bucket in table.Buckets)
         {
-            if (bucket.Count > 1)
-                collisions += bucket.Count - 1; // hver ekstra entry i bucket = én kollision
+            int collisions = 0;
+            foreach (var bucket in table.Buckets)
+            {
+                if (bucket.Count > 1)
+                    collisions += bucket.Count - 1; // hver ekstra entry i bucket = én kollision
+            }
+            return collisions;
         }
-        return collisions;
-    }
 
         public static int CountUsedBuckets(HashTableChaining table)
-    {
-        int used = 0;
-        foreach (var bucket in table.Buckets)
         {
-            if (bucket.Count > 0) used++;
+            int used = 0;
+            foreach (var bucket in table.Buckets)
+            {
+                if (bucket.Count > 0) used++;
+            }
+            return used;
         }
-        return used;
-    }
 
 
 
@@ -397,6 +398,7 @@ public static class CountSketch
         {
             sum += (ulong)(count * count);
         }
+        // Console.WriteLine($"CountSketch Number of buckets: {C.Length}");
         return sum;
     }
 }
@@ -404,65 +406,88 @@ public static class CountSketch
 
 public static class Experiments
 {
-    // EXERCISE 7
-    public static void RunCountSketch(int n, int l, int t)
+    // EXERCISE 7 AND 8
+    public static void RunCountSketch(int n, int l, List<int> t_list)
     {
+        // Ensure that 2^l <= n
+        if (n < (1 << l))
+        {
+            throw new ArgumentException($"n must be at least {1 << l} for l={l}.");
+        }
 
-        Console.WriteLine($"Exercise 7: Running CountSketch with n={n}, l={l}, t={t}");
         var stream = StreamGenerator.CreateStream(n, l).ToList(); // Create the data stream
 
-        BigInteger a0 = HashFunctions.RandomCoeff();
-        BigInteger a1 = HashFunctions.RandomCoeff();
-        Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyModP(x, a0, a1, l);
-
-        var (ExactSum, table) = Estimators.ComputeSquareSum(stream, hashFunc, l); // Compute the exact square sum using chaining
-
-        List<ulong> estimates = new List<ulong>();
-        for (int i = 0; i < 100; i++)
+        for (int i = 0; i < t_list.Count; i++)
         {
-            if (i % 5 == 4)
+            int t = t_list[i];
+            if (t <= 0 || t > 64)
             {
-                Console.WriteLine($"🔄 Iteration {i + 1} of 100"); // ChatGPT suggested emojis :D
+                throw new ArgumentOutOfRangeException(nameof(t), "Parameter 't' must be between 1 and 64.");
             }
-            CountSketch.Run(stream, t);
-            ulong EstimatedSum = CountSketch.EstimateSquareSum(); // Estimate square sum using CountSketch
-            estimates.Add(EstimatedSum);
+            BigInteger a0 = HashFunctions.RandomCoeff();
+            BigInteger a1 = HashFunctions.RandomCoeff();
+            Func<ulong, ulong> hashFunc = x => HashFunctions.MultiplyModP(x, a0, a1, t);
+            var sw = Stopwatch.StartNew();
+            var (ExactSum, table) = Estimators.ComputeSquareSum(stream, hashFunc, t); // Compute the exact square sum using chaining
+            sw.Stop();
+            long exactTime = sw.ElapsedMilliseconds;
+
+            Console.WriteLine($"\n🔍 Running CountSketch with t = {t} (m =2^t = {1 << t})");
+            Console.WriteLine($"Exact square sum: {ExactSum}");
+            List<long> timerEstimates = new List<long>();
+            List<ulong> estimates = new List<ulong>();
+            for (int j = 0; j < 100; j++)
+            {
+                if (j % 5 == 4)
+                {
+                    Console.WriteLine($"🔄 Iteration {j + 1} of 100"); // ChatGPT suggested emojis :D
+                }
+                var stopwatch = Stopwatch.StartNew();
+                CountSketch.Run(stream, t);
+                ulong EstimatedSum = CountSketch.EstimateSquareSum(); // Estimate square sum using CountSketch
+                estimates.Add(EstimatedSum);
+                long time = stopwatch.ElapsedMilliseconds;
+                timerEstimates.Add(time);
+            }
+
+            List<ulong> sortedEstimates = estimates.OrderBy(x => x).ToList();
+            long avgTime = (long)timerEstimates.Average();
+            // Print the MSE
+            double mse = estimates.Select(x => Math.Pow((double)x - (double)ExactSum, 2)).Average();
+            Console.WriteLine($"\nFinished 100 runs of CountSketch with n = {n}, l = {l}, t = {t}");
+            Console.WriteLine($"\n📉 Mean Square Error (MSE): {mse:F2}");
+            Console.WriteLine($"⏱️ Average time for 100 runs: {avgTime} ms");
+            Console.WriteLine($"\nComputed exact square sum using chaining in {exactTime} ms");
+
+            List<ulong> medians = new();
+            for (int g = 0; g < 9; g++)
+            {
+                var group = estimates.Skip(g * 11).Take(11).OrderBy(x => x).ToList(); // group of 11 estimates, sorted
+                medians.Add(group[5]); // 5th element is the median in a sorted list of 11 elements
+            }
+            medians.Sort();
+            Console.WriteLine("\nMedians from 9 groups:");
+            for (int k = 0; k < medians.Count; k++)
+            {
+                Console.WriteLine($"Median {k + 1}: {medians[k]}");
+            }
+            Console.WriteLine($"Exact square sum: {ExactSum}");
+
+            // Export to CSV
+            Console.WriteLine("\nExporting estimates and medians to CSV files, to plot in python...");
+            string estimatePath = $"estimates_t{t}.csv";
+            string header = "Index,EstimatedSquareSum";
+            SaveListToCsv(estimatePath, sortedEstimates, header, ExactSum);
+
+            string medianPath = $"medians_t{t}.csv";
+            string medianHeader = "Index,MedianSquareSum";
+            SaveListToCsv(medianPath, medians, medianHeader, ExactSum);
+
+            Console.WriteLine($"\nEstimates saved to {estimatePath}");
+            Console.WriteLine($"Medians saved to {medianPath}");
         }
-
-        List<ulong> sortedEstimates = estimates.OrderBy(x => x).ToList();
-
-        // Print the MSE
-        double mse = estimates.Select(x => Math.Pow((double)x - (double)ExactSum, 2)).Average();
-        Console.WriteLine($"\n📉 Mean Square Error (MSE): {mse:F2}");
-
-        List<ulong> medians = new();
-        for (int g = 0; g < 9; g++)
-        {
-            var group = estimates.Skip(g * 11).Take(11).OrderBy(x => x).ToList(); // group of 11 estimates, sorted
-            medians.Add(group[5]); // 5th element is the median in a sorted list of 11 elements
-        }
-        medians.Sort();
-        Console.WriteLine("\nMedians from 9 groups:");
-        for (int i = 0; i < medians.Count; i++)
-        {
-            Console.WriteLine($"Median {i + 1}: {medians[i]}");
-        }
-        Console.WriteLine($"Exact square sum: {ExactSum}");
-
-        // Export to CSV
-        Console.WriteLine("\nExporting estimates and medians to CSV files, to plot in python...");
-        string estimatePath = "estimates.csv";
-        string header = "Index,EstimatedSquareSum";
-        SaveListToCsv(estimatePath, sortedEstimates, header, ExactSum);
-
-        string medianPath = "medians.csv";
-        string medianHeader = "Index,MedianSquareSum";
-        SaveListToCsv(medianPath, medians, medianHeader, ExactSum);
-
-        Console.WriteLine($"\nEstimates saved to {estimatePath}");
-        Console.WriteLine($"Medians saved to {medianPath}");
-
     }
+
     // Extracting data to CSV for plotting in Python
     public static void SaveListToCsv(string path, IEnumerable<ulong> data, string header, ulong? exactSum = null)
     {
@@ -486,28 +511,28 @@ public class Program
 {
     public static void Main(string[] args)
     {
-
         HashTableChaining.TestCollisionHandling();
         Console.WriteLine("✅ Collision handling test passed successfully.");
 
-        int n = 1000000; // Size of the stream
+        int n = 1100000; // Size of the stream
         int maxL = 19; // Maximum value for l
         // Ensure that 2^l <= n
 
         var l_list = Enumerable.Range(1, maxL).ToList(); // m = 2^l unique keys
 
-        Console.WriteLine("\nExercise 1c: Benchmarking hash functions:");
-        StreamGenerator.BenchmarkHashFunctions(100000000, 10);
+        // Console.WriteLine("\nExercise 1c: Benchmarking hash functions:");
+        // StreamGenerator.BenchmarkHashFunctions(1000000, 10);
 
-        Console.WriteLine("\nTesting HashTableChaining collision handling:");
-        foreach (var l_val in l_list)
-        {
-            Estimators.BenchmarkSquareSum(n, l_val);
-        }
+        // Console.WriteLine("\nTesting HashTableChaining collision handling:");
+        // foreach (var l_val in l_list)
+        // {
+        //     Estimators.BenchmarkSquareSum(n, l_val);
+        // }
 
         // int t = 10;
+        var t_list = new List<int> {15,17,20}; // Example values for t
 
-        Experiments.RunCountSketch(n, 18, 10); // Example call to run CountSketch with n=1000000, l=16, t=10
+        Experiments.RunCountSketch(n, 20, t_list); // Example call to run CountSketch with n=1000000, l=19, t=10
 
     }
 }
